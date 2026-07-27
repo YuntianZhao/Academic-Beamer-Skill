@@ -1,0 +1,38 @@
+name: Test LuaLaTeX skill workflow
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            biber \
+            latexmk \
+            poppler-utils \
+            ripgrep \
+            texlive-bibtex-extra \
+            texlive-fonts-extra \
+            texlive-latex-extra \
+            texlive-luatex \
+            texlive-science
+
+      - name: Install skill validator
+        run: python3 -m pip install skills-ref
+
+      - name: Run LuaLaTeX skill checks
+        run: bash tests/run_all.sh
