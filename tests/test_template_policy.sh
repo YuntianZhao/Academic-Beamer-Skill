@@ -45,18 +45,62 @@ import pathlib
 import re
 import sys
 
-action = re.compile(r"^\s*(?:-\s+)?uses:\s+(actions/[^@\s]+)@([^\s#]+)(?:\s+#\s+(.+))?$")
+approved_node24_actions = {
+    "actions/checkout": (
+        "3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "v7.0.1",
+    ),
+    "actions/setup-python": (
+        "5fda3b95a4ea91299a34e894583c3862153e4b97",
+        "v7.0.0",
+    ),
+    "actions/upload-artifact": (
+        "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "v7.0.1",
+    ),
+    "actions/download-artifact": (
+        "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+        "v8.0.1",
+    ),
+}
+uses_key = re.compile(r'''^\s*(?:-\s+)?(?:uses|"uses"|'uses')\s*:''')
+action = re.compile(
+    r"^\s*(?:-\s+)?uses:\s+"
+    r"(actions/[A-Za-z0-9_.-]+)@([0-9a-f]{40})"
+    r"\s+#\s+(v[0-9]+(?:\.[0-9]+)*)$"
+)
+errors = []
 for workflow_name in sys.argv[1:]:
     workflow = pathlib.Path(workflow_name)
-    matches = [match for line in workflow.read_text().splitlines() if (match := action.match(line))]
-    if not matches:
-        raise SystemExit(f"FAIL: {workflow} contains no official action uses")
-    for match in matches:
+    uses_count = 0
+    for line_number, line in enumerate(workflow.read_text().splitlines(), start=1):
+        if not uses_key.match(line):
+            continue
+        uses_count += 1
+        match = action.fullmatch(line)
+        if not match:
+            errors.append(
+                f"FAIL: {workflow}:{line_number} action use must match unquoted "
+                "actions/name@40hex # version"
+            )
+            continue
         name, ref, comment = match.groups()
-        if not re.fullmatch(r"[0-9a-f]{40}", ref):
-            raise SystemExit(f"FAIL: {workflow} uses mutable action ref {name}@{ref}")
-        if not comment or not re.match(r"v[0-9]", comment):
-            raise SystemExit(f"FAIL: {workflow} omits a release comment for {name}@{ref}")
+        expected = approved_node24_actions.get(name)
+        if expected is None:
+            errors.append(f"FAIL: {workflow}:{line_number} uses unapproved official action {name}")
+            continue
+        expected_ref, expected_comment = expected
+        if (ref, comment) != expected:
+            actual = f"{name}@{ref}" + (f" # {comment}" if comment else "")
+            errors.append(
+                f"FAIL: {workflow}:{line_number} uses {actual}; expected "
+                f"{name}@{expected_ref} # {expected_comment}"
+            )
+    if not uses_count:
+        errors.append(f"FAIL: {workflow} contains no action uses")
+
+if errors:
+    raise SystemExit("\n".join(errors))
 PY
 
 for option in \

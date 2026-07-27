@@ -98,10 +98,13 @@ if [ "${1-}" != -- ]; then
   exit 64
 fi
 shift
-if [ "${1-}" != ./-deck ]; then
-  printf 'ERROR: expected -- to protect ./-deck, got: %s\n' "${1-<missing>}" >&2
-  exit 64
-fi
+case "${1-}" in
+  -deck|./-deck) ;;
+  *)
+    printf 'ERROR: expected -- to protect -deck or ./-deck, got: %s\n' "${1-<missing>}" >&2
+    exit 64
+    ;;
+esac
 exec "$REAL_BIBER" "${original_args[@]}"
 SCRIPT
 chmod +x "$TMP_DIR/leading dash/bin/latexmk" "$TMP_DIR/leading dash/bin/biber"
