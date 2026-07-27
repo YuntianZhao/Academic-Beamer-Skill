@@ -30,7 +30,9 @@ rg --fixed-strings --quiet 'Beamer-Template` v1.0.0' "$ROOT_DIR/CHANGELOG.md" ||
 rg --fixed-strings --quiet 'mandatory LuaLaTeX' "$ROOT_DIR/CHANGELOG.md" || fail 'changelog omits the mandatory LuaLaTeX workflow'
 rg --fixed-strings --quiet -- '- LuaLaTeX' "$README" || fail 'README does not require LuaLaTeX'
 rg --fixed-strings --line-regexp --quiet -- '- Biber' "$README" || fail 'README does not require Biber for every verified build'
-rg --fixed-strings --quiet 'latexmk -lualatex' "$README" || fail 'README lacks the mandatory LuaLaTeX command'
+rg --fixed-strings --quiet 'latexmk -lualatex -norc' "$README" || fail 'README lacks the RC-isolated LuaLaTeX command'
+rg --fixed-strings --quiet 'academic-beamer/LICENSE' "$README" || fail 'README does not identify the installed MIT license'
+rg --fixed-strings --quiet 'academic-beamer/assets/template/LICENSE.txt' "$README" || fail 'README does not identify the installed LPPL license'
 
 for action in create revise migrate verify; do
   file="$ROOT_DIR/tests/prompt-evals/$action.md"

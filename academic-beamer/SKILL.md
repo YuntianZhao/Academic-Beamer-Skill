@@ -5,7 +5,7 @@ description: >
   academic LaTeX Beamer presentations for research talks, seminars, lectures,
   conference presentations, thesis defenses, or slide decks based on local
   papers, notes, figures, bibliography files, data, or existing TeX.
-license: MIT for skill code; bundled template is LPPL-1.3c. See license files.
+license: MIT for skill code (`LICENSE`); bundled template is LPPL-1.3c (`assets/template/LICENSE.txt`).
 compatibility: Requires latexmk and LuaLaTeX; visual review additionally requires pdftoppm or an equivalent PDF renderer.
 metadata:
   upstream-template: https://github.com/YuntianZhao/Beamer-Template
@@ -80,7 +80,7 @@ When the user has no preference, use the starter defaults: `12pt`, aspect ratio
 Build with:
 
 ```sh
-latexmk -lualatex -interaction=nonstopmode -halt-on-error -file-line-error presentation.tex
+latexmk -lualatex -norc -interaction=nonstopmode -halt-on-error -file-line-error presentation.tex
 ```
 
 Do not replace this with direct `lualatex` calls, pdfLaTeX, or XeLaTeX. Confirm

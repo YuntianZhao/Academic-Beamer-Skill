@@ -86,7 +86,7 @@ Use academic-beamer to compile and visually check presentation.tex.
 The skill runs LuaLaTeX through:
 
 ```sh
-latexmk -lualatex -interaction=nonstopmode -halt-on-error -file-line-error presentation.tex
+latexmk -lualatex -norc -interaction=nonstopmode -halt-on-error -file-line-error presentation.tex
 ```
 
 It confirms LuaTeX or LuaHBTeX in the log and rejects unresolved citations,
@@ -127,6 +127,7 @@ bash tests/run_all.sh
 ## Licensing
 
 Original skill instructions, scripts, tests, and documentation are MIT licensed;
-see `LICENSE`. Vendored template files retain LPPL-1.3c; see
+see `LICENSE` in the repository and `academic-beamer/LICENSE` in the installable
+package. Vendored template files retain LPPL-1.3c; see
 `THIRD_PARTY_LICENSES.md` and
 `academic-beamer/assets/template/LICENSE.txt`.

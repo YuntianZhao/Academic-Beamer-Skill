@@ -18,13 +18,16 @@ printf '%s\n' "$*" >> "$GH_LOG"
 if [ "$1 $2" = 'pr list' ]; then
   case "$GH_SCENARIO" in
     open-canonical)
-      printf '[{"headRefName":"automation/template-v2.0.0"}]\n'
+      printf '[{"headRefName":"automation/template-v2.0.0","headRepositoryOwner":{"login":"example"},"isCrossRepository":false}]\n'
       ;;
     open-retry)
-      printf '[{"headRefName":"automation/template-v2.0.0-run-10-1"}]\n'
+      printf '[{"headRefName":"automation/template-v2.0.0-run-10-1","headRepositoryOwner":{"login":"example"},"isCrossRepository":false}]\n'
+      ;;
+    external-canonical)
+      printf '[{"headRefName":"automation/template-v2.0.0","headRepositoryOwner":{"login":"external"},"isCrossRepository":true}]\n'
       ;;
     unrelated-open)
-      printf '[{"headRefName":"feature/unrelated"}]\n'
+      printf '[{"headRefName":"feature/unrelated","headRepositoryOwner":{"login":"example"},"isCrossRepository":false}]\n'
       ;;
     *)
       printf '[]\n'
@@ -58,6 +61,7 @@ run_scenario() {
 
 [ "$(run_scenario no-remote)" = 'automation/template-v2.0.0' ] || fail 'missing remote branch should select canonical branch'
 [ "$(run_scenario unrelated-open)" = 'automation/template-v2.0.0' ] || fail 'unrelated open PR should not suppress synchronization'
+[ "$(run_scenario external-canonical)" = 'automation/template-v2.0.0' ] || fail 'external fork with canonical branch should not suppress synchronization'
 [ "$(run_scenario canonical-exists)" = 'automation/template-v2.0.0-run-42-3' ] || fail 'existing canonical branch should select retry branch'
 [ "$(run_scenario retry-exists)" = 'automation/template-v2.0.0-run-42-3' ] || fail 'existing retry branch should select a new run-specific branch'
 [ -z "$(run_scenario open-canonical)" ] || fail 'open canonical PR should be a no-op'
@@ -69,5 +73,8 @@ fi
 if rg --fixed-strings --quiet 'api ' "$TMP_DIR/open-retry.log"; then
   fail 'open retry PR should not query remote branch refs'
 fi
+rg --fixed-strings --quiet \
+  'pr list --repo example/project --state open --limit 100 --json headRefName,headRepositoryOwner,isCrossRepository' \
+  "$TMP_DIR/external-canonical.log" || fail 'PR lookup does not request repository trust metadata'
 
 printf 'Synchronization branch selection tests passed.\n'

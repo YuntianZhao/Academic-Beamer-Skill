@@ -7,9 +7,11 @@ if [ "$#" -ne 1 ]; then
 fi
 
 canonical_branch="automation/template-$1"
+repository_owner=${GITHUB_REPOSITORY%%/*}
 existing=$(
-  gh pr list --state open --limit 100 --json headRefName |
-    python3 -c 'import json, sys; prefix = sys.argv[1]; print(sum(item["headRefName"] == prefix or item["headRefName"].startswith(prefix + "-run-") for item in json.load(sys.stdin)))' "$canonical_branch"
+  gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+    --json headRefName,headRepositoryOwner,isCrossRepository |
+    python3 -c 'import json, sys; prefix, expected_owner = sys.argv[1:]; print(sum((item["headRefName"] == prefix or item["headRefName"].startswith(prefix + "-run-")) and item["isCrossRepository"] is False and (item["headRepositoryOwner"] or {}).get("login", "").casefold() == expected_owner.casefold() for item in json.load(sys.stdin)))' "$canonical_branch" "$repository_owner"
 )
 if [ "$existing" -gt 0 ]; then
   exit 0

@@ -7,18 +7,33 @@ if [ "$#" -ne 1 ]; then
 fi
 
 TEX_PATH=$1
+case "$TEX_PATH" in
+  -*) TEX_PATH="./$TEX_PATH" ;;
+esac
 [ -f "$TEX_PATH" ] || { printf 'ERROR: TeX file not found: %s\n' "$TEX_PATH" >&2; exit 1; }
 command -v latexmk >/dev/null 2>&1 || { printf 'ERROR: latexmk is required\n' >&2; exit 1; }
 command -v lualatex >/dev/null 2>&1 || { printf 'ERROR: LuaLaTeX is required\n' >&2; exit 1; }
 
 TEX_DIR=$(CDPATH= cd -- "$(dirname "$TEX_PATH")" && pwd)
 TEX_NAME=$(basename "$TEX_PATH")
+LATEXMK_JOBNAME=
+case "$TEX_NAME" in
+  -*)
+    TEX_NAME="./$TEX_NAME"
+    LATEXMK_JOBNAME="-jobname=${TEX_NAME%.tex}"
+    ;;
+esac
 JOB_NAME=${TEX_NAME%.tex}
 
 BUILD_STATUS=0
 (
   cd "$TEX_DIR"
-  latexmk -lualatex -interaction=nonstopmode -halt-on-error -file-line-error "$TEX_NAME"
+  set -- "$TEX_NAME"
+  if [ -n "$LATEXMK_JOBNAME" ]; then
+    set -- "$LATEXMK_JOBNAME" "$@"
+  fi
+  latexmk -lualatex -norc -interaction=nonstopmode -halt-on-error -file-line-error \
+    "$@"
 ) || BUILD_STATUS=$?
 
 LOG_PATH="$TEX_DIR/$JOB_NAME.log"

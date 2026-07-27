@@ -63,6 +63,26 @@ output=$("$SCRIPT" "$TMP_DIR/real deck/slides/presentation.tex")
 [ -f "$TMP_DIR/real deck/slides/presentation.pdf" ] || fail 'real build did not create PDF'
 [[ "$output" == *"Pages: 3"* ]] || fail 'real build did not report three pages'
 
+mkdir "$TMP_DIR/rc isolation"
+"$CREATE" "$TMP_DIR/rc isolation/slides"
+cat > "$TMP_DIR/rc isolation/slides/.latexmkrc" <<'RC'
+system('touch', 'latexmkrc-executed');
+RC
+output=$("$SCRIPT" "$TMP_DIR/rc isolation/slides/presentation.tex")
+[ -f "$TMP_DIR/rc isolation/slides/presentation.pdf" ] || fail 'RC-isolated build did not create PDF'
+[[ "$output" == *"Pages: 3"* ]] || fail 'RC-isolated build did not report three pages'
+[ ! -e "$TMP_DIR/rc isolation/slides/latexmkrc-executed" ] || fail 'verification executed the project .latexmkrc'
+
+mkdir "$TMP_DIR/leading dash"
+"$CREATE" "$TMP_DIR/leading dash/slides"
+mv "$TMP_DIR/leading dash/slides/presentation.tex" "$TMP_DIR/leading dash/slides/-deck.tex"
+output=$(
+  cd "$TMP_DIR/leading dash/slides"
+  "$SCRIPT" -deck.tex
+)
+[ -f "$TMP_DIR/leading dash/slides/-deck.pdf" ] || fail 'leading-dash TeX path did not create PDF'
+[[ "$output" == *"Pages: 3"* ]] || fail 'leading-dash TeX path did not report three pages'
+
 mkdir "$TMP_DIR/real missing input"
 printf '\\documentclass{article}\n\\begin{document}\n\\input{missing-source.tex}\n\\end{document}\n' \
   > "$TMP_DIR/real missing input/presentation.tex"
@@ -147,6 +167,7 @@ setup_fake_case 'exact arguments'
 output=$(run_fake_case 'exact arguments' "$ROOT_DIR/tests/fixtures/good.log")
 cat > "$CASE_DIR/expected.args" <<'ARGS'
 -lualatex
+-norc
 -interaction=nonstopmode
 -halt-on-error
 -file-line-error

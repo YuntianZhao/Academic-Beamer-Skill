@@ -17,13 +17,9 @@ for required in \
   'contents: read' \
   'contents: write' \
   'pull-requests: write' \
-  'actions/checkout@v4' \
-  'actions/upload-artifact@v4' \
-  'actions/download-artifact@v4' \
   'ref: ${{ github.event.repository.default_branch }}' \
   'persist-credentials: false' \
-  'actions/setup-python@v5' \
-  'python3 -m pip install skills-ref' \
+  'python3 -m pip install skills-ref==0.1.1' \
   'presentation.sty' \
   'presentation-minimal.tex' \
   'LICENSE.txt' \
@@ -66,6 +62,7 @@ done
 
 python3 - "$WORKFLOW" <<'PY'
 import pathlib
+import re
 import sys
 
 lines = pathlib.Path(sys.argv[1]).read_text().splitlines()
@@ -94,6 +91,16 @@ def block(source, marker):
             end = index
             break
     return source[start:end]
+
+
+def action_step(source, name):
+    pattern = re.compile(
+        rf"^\s*(?:-\s+)?uses: {re.escape(name)}@[0-9a-f]{{40}}\s+#\s+v[0-9].*$"
+    )
+    matches = [line for line in source if pattern.fullmatch(line)]
+    if len(matches) != 1:
+        fail(f"expected one immutable {name} action with a release comment")
+    return block(source, matches[0])
 
 
 def job(name):
@@ -138,7 +145,7 @@ if "    if: needs.prepare.outputs.changed == 'true'" not in publish:
     fail("publish job must be skipped when prepare reports no change")
 
 for job_name, job_lines in (("prepare", prepare), ("publish", publish)):
-    checkout = block(job_lines, "      - uses: actions/checkout@v4")
+    checkout = action_step(job_lines, "actions/checkout")
     checkout_text = text(checkout)
     for required in (
         "ref: ${{ github.event.repository.default_branch }}",
@@ -147,8 +154,8 @@ for job_name, job_lines in (("prepare", prepare), ("publish", publish)):
         if required not in checkout_text:
             fail(f"{job_name} checkout policy is missing: {required}")
 
-block(prepare, "      - uses: actions/setup-python@v5")
-if "actions/setup-python@v5" in publish_text:
+action_step(prepare, "actions/setup-python")
+if "actions/setup-python@" in publish_text:
     fail("publish job must not set up dependency runtimes")
 
 prepare_token_steps = (
@@ -228,8 +235,7 @@ if prepare_text.count(changed_condition) != 4:
     fail("only the four prepare update steps may be gated on a changed release")
 
 upload = step(prepare, "Upload prepared update")
-if "        uses: actions/upload-artifact@v4" not in upload:
-    fail("prepare must upload the fixed files through upload-artifact")
+action_step(upload, "actions/upload-artifact")
 try:
     path_start = upload.index("          path: |")
 except ValueError:
@@ -252,8 +258,7 @@ if artifact_paths != expected_paths:
     fail("prepared artifact must contain exactly the six synchronized files")
 
 download = step(publish, "Download prepared update")
-if "        uses: actions/download-artifact@v4" not in download:
-    fail("publish must consume the prepared files through download-artifact")
+action_step(download, "actions/download-artifact")
 apply_commands = script(step(publish, "Apply prepared files"))
 expected_copies = [f"cp .template-update/{path} {path}" for path in expected_paths]
 if apply_commands != expected_copies:
@@ -264,8 +269,9 @@ publish_steps = [
     for line in publish
     if indentation(line) == 6 and line.lstrip().startswith("- ")
 ]
-if publish_steps != [
-    "- uses: actions/checkout@v4",
+if len(publish_steps) != 4 or not re.fullmatch(
+    r"- uses: actions/checkout@[0-9a-f]{40}\s+#\s+v[0-9].*", publish_steps[0]
+) or publish_steps[1:] != [
     "- name: Download prepared update",
     "- name: Apply prepared files",
     "- name: Open update pull request",

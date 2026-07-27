@@ -4,10 +4,21 @@ set -euo pipefail
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ASSET_DIR="$ROOT_DIR/academic-beamer/assets/template"
 MANIFEST="$ROOT_DIR/template-source.json"
+PACKAGE_LICENSE="$ROOT_DIR/academic-beamer/LICENSE"
 
 for file in presentation.sty presentation.tex references.bib LICENSE.txt VERSION; do
   [ -f "$ASSET_DIR/$file" ] || { printf 'FAIL: missing %s\n' "$file" >&2; exit 1; }
 done
+
+[ -f "$PACKAGE_LICENSE" ] || { printf 'FAIL: missing package MIT license\n' >&2; exit 1; }
+cmp "$ROOT_DIR/LICENSE" "$PACKAGE_LICENSE" >/dev/null || {
+  printf 'FAIL: package MIT license differs from repository license\n' >&2
+  exit 1
+}
+rg --fixed-strings --quiet 'LaTeX Project Public License' "$ASSET_DIR/LICENSE.txt" || {
+  printf 'FAIL: vendored template license is not LPPL\n' >&2
+  exit 1
+}
 
 python3 - "$ROOT_DIR" <<'PY'
 import hashlib
