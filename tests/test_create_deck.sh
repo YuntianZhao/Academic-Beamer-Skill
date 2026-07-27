@@ -41,6 +41,16 @@ for file in presentation.sty presentation.tex references.bib LICENSE.txt; do
 done
 [[ "$output" == *"v1.0.0"* ]] || fail 'output does not report template version'
 
+if ! (
+  cd "$TMP_DIR/unrelated working directory"
+  "$SCRIPT" -leading-dash-deck
+) >"$TMP_DIR/leading-dash.out" 2>"$TMP_DIR/leading-dash.err"; then
+  fail 'leading-dash target should be created'
+fi
+for file in presentation.sty presentation.tex references.bib LICENSE.txt; do
+  [ -f "$TMP_DIR/unrelated working directory/-leading-dash-deck/$file" ] || fail "$file was not copied to leading-dash target"
+done
+
 printf 'user content\n' > "$TMP_DIR/deck with spaces/presentation.tex"
 if "$SCRIPT" "$TMP_DIR/deck with spaces" >"$TMP_DIR/repeat.out" 2>"$TMP_DIR/repeat.err"; then
   fail 'repeat invocation should refuse overwrite'
@@ -55,6 +65,16 @@ fi
 [ "$(cat "$TMP_DIR/partial deck/references.bib")" = 'existing bibliography' ] || fail 'existing runtime file was changed'
 for file in presentation.sty presentation.tex LICENSE.txt; do
   [ ! -e "$TMP_DIR/partial deck/$file" ] || fail "$file was copied before overwrite refusal"
+done
+
+mkdir "$TMP_DIR/dangling symlink deck"
+ln -s "$TMP_DIR/missing symlink target/presentation.tex" "$TMP_DIR/dangling symlink deck/presentation.tex"
+if "$SCRIPT" "$TMP_DIR/dangling symlink deck" >"$TMP_DIR/symlink.out" 2>"$TMP_DIR/symlink.err"; then
+  fail 'dangling destination symlink should refuse overwrite'
+fi
+[ -L "$TMP_DIR/dangling symlink deck/presentation.tex" ] || fail 'dangling destination symlink was changed'
+for file in presentation.sty references.bib LICENSE.txt; do
+  [ ! -e "$TMP_DIR/dangling symlink deck/$file" ] || fail "$file was copied before symlink refusal"
 done
 
 if "$SCRIPT" "$TMP_DIR/missing-parent/deck" >"$TMP_DIR/parent.out" 2>"$TMP_DIR/parent.err"; then

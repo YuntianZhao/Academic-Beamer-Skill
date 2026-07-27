@@ -10,6 +10,9 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ASSET_DIR="$SCRIPT_DIR/../assets/template"
 TARGET_DIR=${1%/}
 [ -n "$TARGET_DIR" ] || TARGET_DIR=/
+case "$TARGET_DIR" in
+  -*) TARGET_DIR="./$TARGET_DIR" ;;
+esac
 PARENT_DIR=$(dirname "$TARGET_DIR")
 
 if [ ! -d "$PARENT_DIR" ]; then
@@ -18,7 +21,7 @@ if [ ! -d "$PARENT_DIR" ]; then
 fi
 
 for file in presentation.sty presentation.tex references.bib LICENSE.txt; do
-  if [ -e "$TARGET_DIR/$file" ]; then
+  if [ -e "$TARGET_DIR/$file" ] || [ -L "$TARGET_DIR/$file" ]; then
     printf 'ERROR: refusing to overwrite %s\n' "$TARGET_DIR/$file" >&2
     exit 1
   fi
