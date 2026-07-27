@@ -32,7 +32,8 @@ BUILD_STATUS=0
   if [ -n "$LATEXMK_JOBNAME" ]; then
     set -- "$LATEXMK_JOBNAME" "$@"
   fi
-  latexmk -lualatex -norc -interaction=nonstopmode -halt-on-error -file-line-error \
+  latexmk -lualatex -norc -e '$biber = "biber %O -- %B";' \
+    -interaction=nonstopmode -halt-on-error -file-line-error \
     "$@"
 ) || BUILD_STATUS=$?
 

@@ -76,10 +76,42 @@ output=$("$SCRIPT" "$TMP_DIR/rc isolation/slides/presentation.tex")
 mkdir "$TMP_DIR/leading dash"
 "$CREATE" "$TMP_DIR/leading dash/slides"
 mv "$TMP_DIR/leading dash/slides/presentation.tex" "$TMP_DIR/leading dash/slides/-deck.tex"
-output=$(
+REAL_BIBER=$(command -v biber) || fail 'real biber is required for leading-dash verification'
+REAL_LATEXMK=$(command -v latexmk) || fail 'real latexmk is required for leading-dash verification'
+mkdir "$TMP_DIR/leading dash/bin"
+cat > "$TMP_DIR/leading dash/bin/latexmk" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$REAL_LATEXMK" -silent "$@"
+SCRIPT
+cat > "$TMP_DIR/leading dash/bin/biber" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+original_args=("$@")
+if [ "${1-}" != --onlylog ]; then
+  printf 'ERROR: expected Biber options before --, got: %s\n' "${1-<missing>}" >&2
+  exit 64
+fi
+shift
+if [ "${1-}" != -- ]; then
+  printf 'ERROR: expected -- after Biber options, got: %s\n' "${1-<missing>}" >&2
+  exit 64
+fi
+shift
+if [ "${1-}" != ./-deck ]; then
+  printf 'ERROR: expected -- to protect ./-deck, got: %s\n' "${1-<missing>}" >&2
+  exit 64
+fi
+exec "$REAL_BIBER" "${original_args[@]}"
+SCRIPT
+chmod +x "$TMP_DIR/leading dash/bin/latexmk" "$TMP_DIR/leading dash/bin/biber"
+if ! output=$(
   cd "$TMP_DIR/leading dash/slides"
-  "$SCRIPT" -deck.tex
-)
+  PATH="$TMP_DIR/leading dash/bin:$PATH" REAL_BIBER="$REAL_BIBER" \
+    REAL_LATEXMK="$REAL_LATEXMK" "$SCRIPT" -deck.tex
+); then
+  fail 'leading-dash verification did not place -- between Biber options and basename'
+fi
 [ -f "$TMP_DIR/leading dash/slides/-deck.pdf" ] || fail 'leading-dash TeX path did not create PDF'
 [[ "$output" == *"Pages: 3"* ]] || fail 'leading-dash TeX path did not report three pages'
 
@@ -168,6 +200,8 @@ output=$(run_fake_case 'exact arguments' "$ROOT_DIR/tests/fixtures/good.log")
 cat > "$CASE_DIR/expected.args" <<'ARGS'
 -lualatex
 -norc
+-e
+$biber = "biber %O -- %B";
 -interaction=nonstopmode
 -halt-on-error
 -file-line-error
