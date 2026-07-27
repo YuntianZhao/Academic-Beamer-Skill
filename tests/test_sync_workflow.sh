@@ -14,9 +14,12 @@ for required in \
   'concurrency:' \
   'group: sync-beamer-template-${{ github.repository }}' \
   'cancel-in-progress: false' \
+  'contents: read' \
   'contents: write' \
   'pull-requests: write' \
   'actions/checkout@v4' \
+  'actions/upload-artifact@v4' \
+  'actions/download-artifact@v4' \
   'ref: ${{ github.event.repository.default_branch }}' \
   'persist-credentials: false' \
   'actions/setup-python@v5' \
@@ -40,11 +43,7 @@ for required in \
   'printf '\''changed=false\n'\'' >> "$GITHUB_OUTPUT"' \
   'agentskills validate academic-beamer' \
   'bash tests/run_all.sh' \
-  'canonical_branch="automation/template-$TAG"' \
-  'gh pr list --state open' \
-  'matching-refs/heads/$canonical_branch' \
-  'GITHUB_RUN_ID' \
-  'GITHUB_RUN_ATTEMPT' \
+  '.github/scripts/select-sync-branch.sh "$TAG"' \
   'gh auth setup-git --hostname github.com --force' \
   'gh pr create'; do
   rg --fixed-strings --quiet "$required" "$WORKFLOW" || fail "workflow is missing: $required"
@@ -69,7 +68,8 @@ python3 - "$WORKFLOW" <<'PY'
 import pathlib
 import sys
 
-workflow = pathlib.Path(sys.argv[1]).read_text()
+lines = pathlib.Path(sys.argv[1]).read_text().splitlines()
+workflow = "\n".join(lines)
 token = "${{ github.token }}"
 
 
@@ -77,89 +77,214 @@ def fail(message):
     raise SystemExit(f"FAIL: {message}")
 
 
-def step(name):
-    marker = f"      - name: {name}\n"
-    start = workflow.find(marker)
-    if start < 0:
-        fail(f"workflow step is missing: {name}")
-    end = workflow.find("\n      - ", start + len(marker))
-    return workflow[start:] if end < 0 else workflow[start:end]
+def indentation(line):
+    return len(line) - len(line.lstrip())
 
 
-allowed_token_steps = {
+def block(source, marker):
+    try:
+        start = source.index(marker)
+    except ValueError:
+        fail(f"workflow structure is missing: {marker.strip()}")
+    indent = indentation(marker)
+    end = len(source)
+    for index in range(start + 1, len(source)):
+        line = source[index]
+        if line.strip() and indentation(line) <= indent:
+            end = index
+            break
+    return source[start:end]
+
+
+def job(name):
+    return block(lines, f"  {name}:")
+
+
+def step(job_lines, name):
+    return block(job_lines, f"      - name: {name}")
+
+
+def text(source):
+    return "\n".join(source)
+
+
+def permissions(job_lines):
+    permission_lines = block(job_lines, "    permissions:")[1:]
+    return [line.strip() for line in permission_lines if line.strip()]
+
+
+def script(step_lines):
+    try:
+        start = step_lines.index("        run: |")
+    except ValueError:
+        fail(f"step has no shell script: {step_lines[0].strip()}")
+    return [line.strip() for line in step_lines[start + 1:] if line.strip()]
+
+
+prepare = job("prepare")
+publish = job("publish")
+prepare_text = text(prepare)
+publish_text = text(publish)
+
+if any(line == "permissions:" for line in lines):
+    fail("workflow must not grant top-level permissions")
+if permissions(prepare) != ["contents: read"]:
+    fail("prepare job permissions must be exactly contents: read")
+if permissions(publish) != ["contents: write", "pull-requests: write"]:
+    fail("publish job must have only contents and pull-request write permissions")
+if "    needs: prepare" not in publish:
+    fail("publish job must depend on prepare")
+if "    if: needs.prepare.outputs.changed == 'true'" not in publish:
+    fail("publish job must be skipped when prepare reports no change")
+
+for job_name, job_lines in (("prepare", prepare), ("publish", publish)):
+    checkout = block(job_lines, "      - uses: actions/checkout@v4")
+    checkout_text = text(checkout)
+    for required in (
+        "ref: ${{ github.event.repository.default_branch }}",
+        "persist-credentials: false",
+    ):
+        if required not in checkout_text:
+            fail(f"{job_name} checkout policy is missing: {required}")
+
+block(prepare, "      - uses: actions/setup-python@v5")
+if "actions/setup-python@v5" in publish_text:
+    fail("publish job must not set up dependency runtimes")
+
+prepare_token_steps = (
     "Resolve latest upstream release",
     "Download allowlisted assets",
     "Update provenance",
-    "Open update pull request",
-}
-if workflow.count(token) != len(allowed_token_steps):
-    fail("GitHub token must appear only in the four API/publication steps")
-for name in allowed_token_steps:
-    if token not in step(name):
-        fail(f"GitHub token is not scoped to step: {name}")
-if "\n    env:\n" in workflow:
-    fail("workflow must not define a job-wide environment")
-if token in step("Verify synchronized package"):
-    fail("synchronized package tests must run without a GitHub token")
+)
+if prepare_text.count(token) != len(prepare_token_steps):
+    fail("prepare token must be limited to three read-only API steps")
+for name in prepare_token_steps:
+    if token not in text(step(prepare, name)):
+        fail(f"prepare token is not scoped to step: {name}")
+if token in text(step(prepare, "Verify synchronized package")):
+    fail("prepare validation must not receive even the read-only token")
+if publish_text.count(token) != 1:
+    fail("publish token must appear only in the PR publication step")
+if token not in text(step(publish, "Open update pull request")):
+    fail("publish token is not scoped to PR publication")
 
-checkout_start = workflow.find("      - uses: actions/checkout@v4\n")
-checkout_end = workflow.find("\n      - ", checkout_start + 1)
-checkout = workflow[checkout_start:checkout_end]
-for required in (
-    "ref: ${{ github.event.repository.default_branch }}",
-    "persist-credentials: false",
+for name in (
+    "Install skill validator",
+    "Install build dependencies",
+    "Download allowlisted assets",
+    "Update provenance",
+    "Verify synchronized package",
 ):
-    if required not in checkout:
-        fail(f"checkout policy is missing: {required}")
+    step(prepare, name)
+    if f"      - name: {name}" in publish:
+        fail(f"downloaded-source or dependency step appears in publish: {name}")
+for forbidden in (
+    "pip install",
+    "apt-get",
+    "latexmk",
+    "lualatex",
+    "agentskills validate",
+    "tests/run_all.sh",
+    "gh release download",
+):
+    if forbidden in publish_text:
+        fail(f"publish job executes forbidden content: {forbidden}")
 
-patterns = [
-    line.strip()
-    for line in workflow.splitlines()
-    if line.strip().startswith("--pattern ")
-]
-expected_patterns = [
+patterns = [line.strip() for line in prepare if line.strip().startswith("--pattern ")]
+if patterns != [
     "--pattern presentation.sty \\",
     "--pattern presentation-minimal.tex \\",
     "--pattern LICENSE.txt",
-]
-if patterns != expected_patterns:
+]:
     fail("release download patterns must exactly match the three-file allowlist")
 
+download_script = text(step(prepare, "Download allowlisted assets"))
 for required in (
     "cp .template-import/presentation.sty academic-beamer/assets/template/presentation.sty",
     "cp .template-import/presentation-minimal.tex academic-beamer/assets/template/presentation.tex",
     "cp .template-import/LICENSE.txt academic-beamer/assets/template/LICENSE.txt",
     "printf '%s\\n' \"$TAG\" > academic-beamer/assets/template/VERSION",
+):
+    if required not in download_script:
+        fail(f"prepare asset update is missing: {required}")
+provenance_script = text(step(prepare, "Update provenance"))
+for required in (
     'licenses = root / "THIRD_PARTY_LICENSES.md"',
     'text = re.sub(r"release `[^`]+`", f"release `{tag_name}`", text, count=1)',
 ):
-    if required not in workflow:
-        fail(f"synchronization update is missing: {required}")
+    if required not in provenance_script:
+        fail(f"prepare provenance update is missing: {required}")
 
 changed_condition = "if: steps.release.outputs.changed == 'true'"
 for name in (
     "Download allowlisted assets",
     "Update provenance",
     "Verify synchronized package",
-    "Open update pull request",
+    "Upload prepared update",
 ):
-    if changed_condition not in step(name):
-        fail(f"no-change run does not skip step: {name}")
-if workflow.count(changed_condition) != 4:
-    fail("only the four update steps may be gated on a changed release")
+    if changed_condition not in text(step(prepare, name)):
+        fail(f"no-change run does not skip prepare step: {name}")
+if prepare_text.count(changed_condition) != 4:
+    fail("only the four prepare update steps may be gated on a changed release")
 
-publication = step("Open update pull request")
+upload = step(prepare, "Upload prepared update")
+if "        uses: actions/upload-artifact@v4" not in upload:
+    fail("prepare must upload the fixed files through upload-artifact")
+try:
+    path_start = upload.index("          path: |")
+except ValueError:
+    fail("prepared artifact must use an explicit multiline path allowlist")
+artifact_paths = []
+for line in upload[path_start + 1:]:
+    if line.strip() and indentation(line) <= 10:
+        break
+    if line.strip():
+        artifact_paths.append(line.strip())
+expected_paths = [
+    "academic-beamer/assets/template/presentation.sty",
+    "academic-beamer/assets/template/presentation.tex",
+    "academic-beamer/assets/template/LICENSE.txt",
+    "academic-beamer/assets/template/VERSION",
+    "template-source.json",
+    "THIRD_PARTY_LICENSES.md",
+]
+if artifact_paths != expected_paths:
+    fail("prepared artifact must contain exactly the six synchronized files")
+
+download = step(publish, "Download prepared update")
+if "        uses: actions/download-artifact@v4" not in download:
+    fail("publish must consume the prepared files through download-artifact")
+apply_commands = script(step(publish, "Apply prepared files"))
+expected_copies = [f"cp .template-update/{path} {path}" for path in expected_paths]
+if apply_commands != expected_copies:
+    fail("publish must copy exactly the six prepared files to fixed destinations")
+
+publish_steps = [
+    line.strip()
+    for line in publish
+    if indentation(line) == 6 and line.lstrip().startswith("- ")
+]
+if publish_steps != [
+    "- uses: actions/checkout@v4",
+    "- name: Download prepared update",
+    "- name: Apply prepared files",
+    "- name: Open update pull request",
+]:
+    fail("publish job contains an unexpected step")
+
+publication = text(step(publish, "Open update pull request"))
 for required in (
-    "gh pr list --state open",
+    '.github/scripts/select-sync-branch.sh "$TAG"',
     "exit 0",
-    'canonical_branch="automation/template-$TAG"',
-    "matching-refs/heads/$canonical_branch",
-    "GITHUB_RUN_ID",
-    "GITHUB_RUN_ATTEMPT",
     "gh auth setup-git --hostname github.com --force",
+    "git push --set-upstream origin \"$branch\"",
+    "gh pr create",
 ):
     if required not in publication:
-        fail(f"publication retry policy is missing: {required}")
+        fail(f"publication policy is missing: {required}")
+for forbidden in (".template-update", "git push --force", "git push -f"):
+    if forbidden in publication:
+        fail(f"publication executes or force-pushes prepared content: {forbidden}")
 PY
 
 printf 'Synchronization workflow checks passed.\n'

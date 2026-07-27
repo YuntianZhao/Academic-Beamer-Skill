@@ -9,13 +9,14 @@ concurrency:
   group: sync-beamer-template-${{ github.repository }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  sync:
+  prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.release.outputs.changed }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -137,26 +138,59 @@ jobs:
           agentskills validate academic-beamer
           bash tests/run_all.sh
 
-      - name: Open update pull request
+      - name: Upload prepared update
         if: steps.release.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: template-update-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            academic-beamer/assets/template/presentation.sty
+            academic-beamer/assets/template/presentation.tex
+            academic-beamer/assets/template/LICENSE.txt
+            academic-beamer/assets/template/VERSION
+            template-source.json
+            THIRD_PARTY_LICENSES.md
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Download prepared update
+        uses: actions/download-artifact@v4
+        with:
+          name: template-update-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .template-update
+
+      - name: Apply prepared files
+        run: |
+          cp .template-update/academic-beamer/assets/template/presentation.sty academic-beamer/assets/template/presentation.sty
+          cp .template-update/academic-beamer/assets/template/presentation.tex academic-beamer/assets/template/presentation.tex
+          cp .template-update/academic-beamer/assets/template/LICENSE.txt academic-beamer/assets/template/LICENSE.txt
+          cp .template-update/academic-beamer/assets/template/VERSION academic-beamer/assets/template/VERSION
+          cp .template-update/template-source.json template-source.json
+          cp .template-update/THIRD_PARTY_LICENSES.md THIRD_PARTY_LICENSES.md
+
+      - name: Open update pull request
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          canonical_branch="automation/template-$TAG"
-          existing=$(
-            gh pr list --state open --limit 100 --json headRefName |
-              python3 -c 'import json, sys; prefix = sys.argv[1]; print(sum(item["headRefName"] == prefix or item["headRefName"].startswith(prefix + "-run-") for item in json.load(sys.stdin)))' "$canonical_branch"
-          )
-          if [ "$existing" -gt 0 ]; then
+          branch=$(.github/scripts/select-sync-branch.sh "$TAG")
+          if [ -z "$branch" ]; then
             printf 'An update PR already exists for %s.\n' "$TAG"
             exit 0
-          fi
-
-          branch="$canonical_branch"
-          remote_count=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$canonical_branch" --jq 'length')
-          if [ "$remote_count" -gt 0 ]; then
-            branch="$canonical_branch-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           fi
 
           git config user.name "github-actions[bot]"
