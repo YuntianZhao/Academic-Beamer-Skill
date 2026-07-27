@@ -1,12 +1,11 @@
 ---
 name: academic-beamer
 description: >
-  Create, revise, compile, and visually review academic LaTeX Beamer
-  presentations using the bundled minimalist template. Use for research talks,
-  seminars, lectures, conference presentations, thesis defenses, and slide
-  decks based on local papers, notes, figures, bibliography files, data, or
-  existing TeX. When this skill is invoked, the bundled template is mandatory
-  and must not be replaced by another Beamer theme.
+  Use when creating, revising, migrating, compiling, or visually reviewing
+  academic LaTeX Beamer presentations for research talks, seminars, lectures,
+  conference presentations, thesis defenses, or slide decks based on local
+  papers, notes, figures, bibliography files, data, or existing TeX where the
+  bundled template is mandatory and must not be replaced by another Beamer theme.
 license: MIT for skill code; bundled template is LPPL-1.3c. See license files.
 compatibility: Requires latexmk and LuaLaTeX; visual review additionally requires pdftoppm or an equivalent PDF renderer.
 metadata:
@@ -42,9 +41,13 @@ Use the starter's upstream defaults when the user has no preference.
    Never invent evidence, references, or data.
 4. Ask only for requirements not inferable from the inputs: purpose, audience,
    duration, language, title metadata, emphasis, and supported template options.
-5. For a new full deck, present a slide-by-slide outline with each frame's title,
-   purpose, content pattern, and source material. Do not draft the complete deck
-   until the user approves. Targeted revisions and verification skip this gate.
+5. For a new full deck, the pre-approval response must include:
+   - A slide-by-slide outline with each frame's title, purpose, content pattern,
+     and source material.
+   - `Build (REQUIRED): The approved deck will be compiled with LuaLaTeX through
+     latexmk -lualatex.`
+   Do not draft the complete deck until the user approves. Targeted revisions
+   and verification skip this gate.
 6. For a new deck, run `scripts/create-deck.sh <target-directory>`. For migration,
    create a separate destination unless the user explicitly chooses otherwise.
 7. Author or revise content using `references/content-patterns.md` and
