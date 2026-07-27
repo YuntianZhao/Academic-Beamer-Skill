@@ -15,40 +15,56 @@ TEX_DIR=$(CDPATH= cd -- "$(dirname "$TEX_PATH")" && pwd)
 TEX_NAME=$(basename "$TEX_PATH")
 JOB_NAME=${TEX_NAME%.tex}
 
+BUILD_STATUS=0
 (
   cd "$TEX_DIR"
   latexmk -lualatex -interaction=nonstopmode -halt-on-error -file-line-error "$TEX_NAME"
-)
+) || BUILD_STATUS=$?
 
 LOG_PATH="$TEX_DIR/$JOB_NAME.log"
 PDF_PATH="$TEX_DIR/$JOB_NAME.pdf"
 [ -f "$LOG_PATH" ] || { printf 'ERROR: build log was not created\n' >&2; exit 1; }
-[ -f "$PDF_PATH" ] || { printf 'ERROR: PDF was not created\n' >&2; exit 1; }
 
-rg --quiet '^This is Lua(HB)?TeX(?:,| |$)' "$LOG_PATH" || {
+grep -Eq '^This is Lua(HB)?TeX([, ]|$)' "$LOG_PATH" || {
   printf 'ERROR: build log does not identify LuaTeX or LuaHBTeX\n' >&2
   exit 1
 }
 
-if rg --ignore-case --quiet 'undefined citations?|undefined references?|Citation .* undefined|Reference .* undefined' "$LOG_PATH"; then
+if grep -Eiq 'undefined citations?|undefined references?|Citation .* undefined|Reference .* undefined' "$LOG_PATH"; then
   printf 'ERROR: undefined citation or reference remains\n' >&2
   exit 1
 fi
-if rg --quiet 'LaTeX Warning: File .* not found|! LaTeX Error: File .* not found' "$LOG_PATH"; then
+if grep -Eq 'LaTeX Warning: File .* not found|! LaTeX Error: File .* not found' "$LOG_PATH"; then
   printf 'ERROR: referenced source file is missing\n' >&2
   exit 1
 fi
-if rg --quiet 'Overfull \\[hv]box' "$LOG_PATH"; then
+if grep -Eq 'Overfull \\[hv]box' "$LOG_PATH"; then
   printf 'ERROR: meaningful overfull box warning remains\n' >&2
   exit 1
 fi
-if rg --ignore-case --quiet 'Rerun to get|Label\(s\) may have changed|Please rerun' "$LOG_PATH"; then
+if grep -Eiq 'Rerun to get|Label\(s\) may have changed|Please rerun' "$LOG_PATH"; then
   printf 'ERROR: unresolved rerun request remains\n' >&2
   exit 1
 fi
 
-PAGES=$(rg --only-matching 'Output written on .+ \([0-9]+ pages?' "$LOG_PATH" | rg --only-matching '[0-9]+ pages?' | rg --only-matching '[0-9]+' | tail -n 1)
-UNDERFULL=$(rg --count 'Underfull \\[hv]box' "$LOG_PATH" || true)
+if [ "$BUILD_STATUS" -ne 0 ]; then
+  printf 'ERROR: LuaLaTeX build failed (latexmk exit status %s)\n' "$BUILD_STATUS" >&2
+  exit 1
+fi
+[ -f "$PDF_PATH" ] || { printf 'ERROR: PDF was not created\n' >&2; exit 1; }
+
+PAGES=$(
+  awk '
+    match($0, /Output written on .+ \([0-9]+ pages?/) {
+      record = substr($0, RSTART, RLENGTH)
+      sub(/^.*\(/, "", record)
+      sub(/ pages?$/, "", record)
+      pages = record
+    }
+    END { if (pages != "") print pages }
+  ' "$LOG_PATH"
+)
+UNDERFULL=$(awk '/Underfull \\[hv]box/ { count++ } END { print count + 0 }' "$LOG_PATH")
 printf 'PDF: %s\n' "$PDF_PATH"
 printf 'Pages: %s\n' "${PAGES:-unknown}"
 printf 'Underfull box warnings: %s\n' "${UNDERFULL:-0}"
