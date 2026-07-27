@@ -13,7 +13,10 @@ Required for verified output:
 
 - `latexmk`
 - LuaLaTeX
-- Biber when the deck contains citations
+- Biber
+
+Biber is required even for citation-free decks because the bundled template
+loads `biblatex-chicago` with the Biber backend.
 
 Visual checking additionally needs Poppler (`pdfinfo` and `pdftoppm`) and an
 agent harness capable of inspecting images. Deck creation itself is offline; all
