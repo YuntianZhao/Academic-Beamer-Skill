@@ -9,6 +9,12 @@ fi
 PDF_PATH=$1
 OUTPUT_DIR=${2%/}
 [ -n "$OUTPUT_DIR" ] || OUTPUT_DIR=/
+case "$PDF_PATH" in
+  -*) PDF_PATH="./$PDF_PATH" ;;
+esac
+case "$OUTPUT_DIR" in
+  -*) OUTPUT_DIR="./$OUTPUT_DIR" ;;
+esac
 [ -f "$PDF_PATH" ] || { printf 'ERROR: PDF not found: %s\n' "$PDF_PATH" >&2; exit 1; }
 command -v pdfinfo >/dev/null 2>&1 || { printf 'ERROR: pdfinfo is required\n' >&2; exit 1; }
 command -v pdftoppm >/dev/null 2>&1 || { printf 'ERROR: pdftoppm is required\n' >&2; exit 1; }
@@ -28,7 +34,6 @@ if [ -e "$OUTPUT_DIR" ] || [ -L "$OUTPUT_DIR" ]; then
     exit 1
   fi
 fi
-mkdir -p "$OUTPUT_DIR"
 
 if ! PAGES=$(pdfinfo "$PDF_PATH" | awk '
   $1 == "Pages:" && $2 ~ /^[0-9]+$/ { pages = $2; exit }
@@ -42,6 +47,7 @@ if [ "$PAGES" -le 0 ]; then
   exit 1
 fi
 
+mkdir -p "$OUTPUT_DIR"
 for ((page = 1; page <= PAGES; page++)); do
   printf -v output '%s/slide-%03d' "$OUTPUT_DIR" "$page"
   pdftoppm -f "$page" -l "$page" -singlefile -jpeg -r 160 "$PDF_PATH" "$output"

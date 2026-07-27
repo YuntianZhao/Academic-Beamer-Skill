@@ -145,6 +145,18 @@ fi
 assert_line "ERROR: output parent does not exist: $TMP_DIR/missing" \
   "$TMP_DIR/missing-parent.err" 'missing-output-parent diagnostic is absent'
 
+INVALID_PDF_DIR="$TMP_DIR/invalid PDF"
+INVALID_OUTPUT="$INVALID_PDF_DIR/rendered slides"
+mkdir "$INVALID_PDF_DIR"
+printf 'not a PDF\n' > "$INVALID_PDF_DIR/broken.pdf"
+if "$RENDER" "$INVALID_PDF_DIR/broken.pdf" "$INVALID_OUTPUT" \
+    >"$TMP_DIR/invalid-pdf.out" 2>"$TMP_DIR/invalid-pdf.err"; then
+  fail 'invalid PDF should fail inspection'
+fi
+[ ! -e "$INVALID_OUTPUT" ] || fail 'failed PDF inspection created an output directory'
+assert_line "ERROR: unable to determine PDF page count: $INVALID_PDF_DIR/broken.pdf" \
+  "$TMP_DIR/invalid-pdf.err" 'failed-PDF-inspection diagnostic is absent'
+
 MISMATCH_OUTPUT="$FAKE_ROOT/mismatched slides"
 if PATH="$FAKE_BIN:/usr/bin:/bin" FAKE_ARGS="$FAKE_ROOT/mismatch.args" FAKE_SKIP_PAGE=2 \
     "$RENDER" "$FAKE_PDF" "$MISMATCH_OUTPUT" >"$TMP_DIR/mismatch.out" 2>"$TMP_DIR/mismatch.err"; then
@@ -156,6 +168,46 @@ assert_line 'ERROR: rendered 2 images for 3 PDF pages' "$TMP_DIR/mismatch.err" \
 "$CREATE" "$TMP_DIR/deck"
 "$VERIFY" "$TMP_DIR/deck/presentation.tex" >/dev/null
 "$RENDER" "$TMP_DIR/deck/presentation.pdf" "$TMP_DIR/real rendered slides" >/dev/null
+
+EMPTY_OUTPUT="$TMP_DIR/existing empty output"
+mkdir "$EMPTY_OUTPUT"
+"$RENDER" "$TMP_DIR/deck/presentation.pdf" "$EMPTY_OUTPUT" >/dev/null
+[ -f "$EMPTY_OUTPUT/slide-001.jpg" ] || \
+  fail 'existing empty output directory is missing the first slide'
+
+find / -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort > "$TMP_DIR/root.before"
+if "$RENDER" "$TMP_DIR/deck/presentation.pdf" / >"$TMP_DIR/root.out" 2>"$TMP_DIR/root.err"; then
+  fail 'root output directory should be rejected'
+fi
+find / -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort > "$TMP_DIR/root.after"
+cmp "$TMP_DIR/root.before" "$TMP_DIR/root.after" >/dev/null || \
+  fail 'root output refusal changed the root directory'
+assert_line 'ERROR: refusing to overwrite nonempty output directory: /' "$TMP_DIR/root.err" \
+  'root-output refusal diagnostic is absent'
+
+LEADING_DASH_DIR="$TMP_DIR/leading dash paths"
+mkdir "$LEADING_DASH_DIR"
+cp "$TMP_DIR/deck/presentation.pdf" "$LEADING_DASH_DIR/presentation.pdf"
+if ! (
+  cd "$LEADING_DASH_DIR"
+  "$RENDER" presentation.pdf -rendered-slides
+) >"$TMP_DIR/leading-output.out" 2>"$TMP_DIR/leading-output.err"; then
+  fail 'leading-dash output directory should render successfully'
+fi
+[ -f "$LEADING_DASH_DIR/-rendered-slides/slide-001.jpg" ] || \
+  fail 'leading-dash output directory is missing the first slide'
+
+cp "$TMP_DIR/deck/presentation.pdf" "$LEADING_DASH_DIR/-box"
+if ! (
+  cd "$LEADING_DASH_DIR"
+  "$RENDER" -box rendered-leading-pdf
+) >"$TMP_DIR/leading-pdf.out" 2>"$TMP_DIR/leading-pdf.err"; then
+  [ ! -e "$LEADING_DASH_DIR/rendered-leading-pdf" ] || \
+    fail 'leading-dash PDF failure left a new output directory'
+  fail 'leading-dash PDF should render successfully'
+fi
+[ -f "$LEADING_DASH_DIR/rendered-leading-pdf/slide-003.jpg" ] || \
+  fail 'leading-dash PDF render is missing the third slide'
 
 pages=$(pdfinfo "$TMP_DIR/deck/presentation.pdf" | awk '$1 == "Pages:" { print $2; exit }')
 rendered=$(find "$TMP_DIR/real rendered slides" -type f -name 'slide-[0-9][0-9][0-9].jpg' | wc -l | tr -d ' ')
