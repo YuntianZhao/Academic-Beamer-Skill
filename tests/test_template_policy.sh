@@ -63,23 +63,27 @@ approved_node24_actions = {
         "v8.0.1",
     ),
 }
-official_action = re.compile(r"^\s*(?:-\s+)?uses\s*:\s*actions/")
-action = re.compile(r"^\s*(?:-\s+)?uses:\s+(actions/[^@\s]+)@([^\s#]+)(?:\s+#\s+(.+))?$")
+uses_key = re.compile(r'''^\s*(?:-\s+)?(?:uses|"uses"|'uses')\s*:''')
+action = re.compile(
+    r"^\s*(?:-\s+)?uses:\s+"
+    r"(actions/[A-Za-z0-9_.-]+)@([0-9a-f]{40})"
+    r"\s+#\s+(v[0-9]+(?:\.[0-9]+)*)$"
+)
 errors = []
 for workflow_name in sys.argv[1:]:
     workflow = pathlib.Path(workflow_name)
-    matches = []
+    uses_count = 0
     for line_number, line in enumerate(workflow.read_text().splitlines(), start=1):
-        if not official_action.match(line):
+        if not uses_key.match(line):
             continue
-        match = action.match(line)
+        uses_count += 1
+        match = action.fullmatch(line)
         if not match:
-            errors.append(f"FAIL: {workflow}:{line_number} has a malformed official action use")
+            errors.append(
+                f"FAIL: {workflow}:{line_number} action use must match unquoted "
+                "actions/name@40hex # version"
+            )
             continue
-        matches.append((line_number, match))
-    if not matches:
-        errors.append(f"FAIL: {workflow} contains no official action uses")
-    for line_number, match in matches:
         name, ref, comment = match.groups()
         expected = approved_node24_actions.get(name)
         if expected is None:
@@ -92,6 +96,8 @@ for workflow_name in sys.argv[1:]:
                 f"FAIL: {workflow}:{line_number} uses {actual}; expected "
                 f"{name}@{expected_ref} # {expected_comment}"
             )
+    if not uses_count:
+        errors.append(f"FAIL: {workflow} contains no action uses")
 
 if errors:
     raise SystemExit("\n".join(errors))
