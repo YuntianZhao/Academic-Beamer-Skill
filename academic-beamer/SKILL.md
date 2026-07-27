@@ -4,8 +4,7 @@ description: >
   Use when creating, revising, migrating, compiling, or visually reviewing
   academic LaTeX Beamer presentations for research talks, seminars, lectures,
   conference presentations, thesis defenses, or slide decks based on local
-  papers, notes, figures, bibliography files, data, or existing TeX where the
-  bundled template is mandatory and must not be replaced by another Beamer theme.
+  papers, notes, figures, bibliography files, data, or existing TeX.
 license: MIT for skill code; bundled template is LPPL-1.3c. See license files.
 compatibility: Requires latexmk and LuaLaTeX; visual review additionally requires pdftoppm or an equivalent PDF renderer.
 metadata:
@@ -19,7 +18,8 @@ bundled minimalist Beamer template.
 
 ## Template Contract
 
-Once this skill is invoked, the bundled template is mandatory. Copy or preserve
+Once this skill is invoked, the bundled template is mandatory.
+It must not be replaced by another Beamer theme. Copy or preserve
 `assets/template/presentation.sty`. Do not switch to Madrid, Metropolis, a
 university theme, a user-provided theme, or another design system.
 
