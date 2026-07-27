@@ -5,6 +5,10 @@ on:
     - cron: "17 8 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: sync-beamer-template-${{ github.repository }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -12,12 +16,12 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -42,6 +46,8 @@ jobs:
 
       - name: Resolve latest upstream release
         id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag=$(gh release view --repo YuntianZhao/Beamer-Template --json tagName --jq .tagName)
           current=$(tr -d '\r\n' < academic-beamer/assets/template/VERSION)
@@ -55,6 +61,7 @@ jobs:
       - name: Download allowlisted assets
         if: steps.release.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           mkdir .template-import
@@ -72,6 +79,7 @@ jobs:
       - name: Update provenance
         if: steps.release.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           python3 - <<'PY'
@@ -132,16 +140,27 @@ jobs:
       - name: Open update pull request
         if: steps.release.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          branch="automation/template-$TAG"
-          existing=$(gh pr list --state open --head "$branch" --json number --jq 'length')
+          canonical_branch="automation/template-$TAG"
+          existing=$(
+            gh pr list --state open --limit 100 --json headRefName |
+              python3 -c 'import json, sys; prefix = sys.argv[1]; print(sum(item["headRefName"] == prefix or item["headRefName"].startswith(prefix + "-run-") for item in json.load(sys.stdin)))' "$canonical_branch"
+          )
           if [ "$existing" -gt 0 ]; then
             printf 'An update PR already exists for %s.\n' "$TAG"
             exit 0
           fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          branch="$canonical_branch"
+          remote_count=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$canonical_branch" --jq 'length')
+          if [ "$remote_count" -gt 0 ]; then
+            branch="$canonical_branch-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add \
             academic-beamer/assets/template/presentation.sty \
@@ -151,6 +170,7 @@ jobs:
             template-source.json \
             THIRD_PARTY_LICENSES.md
           git commit -m "chore: sync Beamer template $TAG"
+          gh auth setup-git --hostname github.com --force
           git push --set-upstream origin "$branch"
           gh pr create \
             --title "chore: sync Beamer template $TAG" \
