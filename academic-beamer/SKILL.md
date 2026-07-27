@@ -30,7 +30,8 @@ Supported choices are:
 - Mode: `light` or `dark`.
 - Page numbers: `pagenumbers` or `nopagenumbers`.
 
-Use the starter's upstream defaults when the user has no preference.
+When the user has no preference, use the starter defaults: `12pt`, aspect ratio
+`43`, `light`, and `pagenumbers`.
 
 ## Workflow
 
