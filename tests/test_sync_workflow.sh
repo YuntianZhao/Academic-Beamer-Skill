@@ -9,7 +9,7 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 
 for required in \
   'schedule:' \
-  'cron: "17 8 * * 1"' \
+  'cron: "17 8 * * *"' \
   'workflow_dispatch:' \
   'concurrency:' \
   'group: sync-beamer-template-${{ github.repository }}' \
@@ -285,6 +285,7 @@ for required in (
     "gh auth setup-git --hostname github.com --force",
     "git push --set-upstream origin \"$branch\"",
     "gh pr create",
+    "--assignee YuntianZhao",
 ):
     if required not in publication:
         fail(f"publication policy is missing: {required}")
