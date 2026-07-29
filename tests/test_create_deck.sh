@@ -18,6 +18,7 @@ INSTALL_DIR="$TMP_DIR/installed skill with spaces/academic-beamer"
 mkdir -p "$INSTALL_DIR/scripts" "$INSTALL_DIR/assets"
 cp "$SCRIPT" "$INSTALL_DIR/scripts/create-deck.sh"
 cp -R "$ASSET_DIR" "$INSTALL_DIR/assets/template"
+printf 'v9.8.7\n' > "$INSTALL_DIR/assets/template/VERSION"
 
 mkdir "$TMP_DIR/unrelated working directory"
 mkdir "$TMP_DIR/no-network-bin"
@@ -39,7 +40,7 @@ for file in presentation.sty presentation.tex references.bib LICENSE.txt; do
   [ -f "$TMP_DIR/deck with spaces/$file" ] || fail "$file was not copied"
   cmp "$ASSET_DIR/$file" "$TMP_DIR/deck with spaces/$file" >/dev/null || fail "$file differs from bundled asset"
 done
-[[ "$output" == *"v1.0.0"* ]] || fail 'output does not report template version'
+[[ "$output" == *"Bundled template: v9.8.7"* ]] || fail 'output does not report template version'
 
 if ! (
   cd "$TMP_DIR/unrelated working directory"
