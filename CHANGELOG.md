@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v1.2.1 - 2026-10-17
+
+- Split the rich-content build fixture's code listing onto its own slide so
+  template v1.2.1 typography does not overflow the synchronization check.
+  Preserve all content coverage and strict overfull-box rejection.
 - Align repository domain-documentation guidance with the installed Matt Pocock
   skills' `GLOSSARY.md` convention.
 - Refresh GitHub issue, sub-issue, and optional PR-triage guidance while preserving

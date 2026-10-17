@@ -71,6 +71,8 @@ cat > "$RICH_DIR/references.bib" <<'EOF'
   date = {2026}
 }
 EOF
+# Keep listings on their own slide so template typography changes do not
+# turn the rich-content compatibility fixture into an overcrowded slide.
 cat > "$RICH_DIR/presentation.tex" <<'EOF'
 \providecommand{\presentationaspectratio}{169}
 \providecommand{\presentationmode}{light}
@@ -84,7 +86,7 @@ cat > "$RICH_DIR/presentation.tex" <<'EOF'
 \date{2026}
 \begin{document}
 \frame{\titlepage}
-\begin{frame}[fragile]
+\begin{frame}
   \frametitle{Result patterns}
   Evidence follows \parencite{sample2026}.
   \begin{equation*} y=\alpha+\beta x+\varepsilon \end{equation*}
@@ -96,6 +98,9 @@ cat > "$RICH_DIR/presentation.tex" <<'EOF'
       \begin{tabular}{lr}\toprule Case & Value\\\midrule A & 1\\B & 2\\\bottomrule\end{tabular}
     \end{column}
   \end{columns}
+\end{frame}
+\begin{frame}[fragile]
+  \frametitle{Code listing}
   \begin{lstlisting}[language=Python]
 value = 1
   \end{lstlisting}
