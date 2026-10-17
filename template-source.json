@@ -1,13 +1,13 @@
 {
   "repository": "YuntianZhao/Beamer-Template",
-  "release": "v1.2.0",
-  "source_commit": "90c1f1cb045b0a59c78cde772f8d3bc2057f358b",
-  "imported_at": "2026-08-26T21:48:08+00:00",
+  "release": "v1.2.1",
+  "source_commit": "5a677fe9e92036274b9a1983450b068577b6adb2",
+  "imported_at": "2026-10-17T15:11:03.454463+00:00",
   "files": [
     {
       "source": "presentation.sty",
       "destination": "academic-beamer/assets/template/presentation.sty",
-      "sha256": "f60a0fcc35997d569afb425e4eb6b8a9ae1b930bf9a7a7f76ce5ff800de24f60"
+      "sha256": "f9b17bde62a786905a43e4f052732880fc7b295346890ed4602603df03103c1a"
     },
     {
       "source": "presentation-minimal.tex",

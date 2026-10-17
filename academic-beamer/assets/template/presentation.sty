@@ -11,7 +11,7 @@
 % This work consists of presentation.sty and presentation-minimal.tex.
 
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{presentation}[2026/08/26 v1.2.0 Minimalist academic Beamer template]
+\ProvidesPackage{presentation}[2026/10/17 v1.2.1 Minimalist academic Beamer template]
 
 % ---- Select light or dark color mode and slide numbers ----
 
@@ -37,7 +37,8 @@
 \let\mathbffrak\relax
 \usepackage[scr=boondox, frak=euler]{mathalfa} % Distinct lowercase and bold script letters
 \setmonofont[
-  Scale=1.0,
+  Scale=0.9,
+  RawFeature={-calt,-liga,-clig}, % Disable contextual and standard code ligatures
   Extension=.otf,
   UprightFont=*-Regular,
   ItalicFont=*-Italic,
@@ -58,7 +59,8 @@
 \let\mathbffrak\relax
 \usepackage[scr=boondox, frak=euler]{mathalfa} % Distinct lowercase and bold script letters
 \setmonofont[
-  Scale=1.0,
+  Scale=0.9,
+  RawFeature={-calt,-liga,-clig}, % Disable contextual and standard code ligatures
   Extension=.otf,
   UprightFont=*-Regular,
   ItalicFont=*-Italic,
@@ -77,7 +79,7 @@
 \usepackage[upint]{libertinust1math} % Use Libertinus math font
 \renewcommand{\sfdefault}{LibertinusSans-TLF}
 \renewcommand{\familydefault}{\sfdefault}
-\usepackage[scale=1.0]{cascadia-code} % Monospace font
+\usepackage[scale=0.9]{cascadia-code} % Monospace font
 \DeclareFontShape{T1}{LibertinusSans-TLF}{b}{it}{%
   <-> ssub * LibertinusSans-TLF/m/it}{}
 \usepackage[cal=stixplain, scr=boondox, frak=euler]{mathalfa} % Lowercase and bold math alphabets
@@ -121,9 +123,16 @@
 % Set spacing on lines
 \usepackage{microtype}
 
-% Remove ligatures
+% Remove text f-ligatures and all code-font ligatures
 \ifxetex\else
 \DisableLigatures[f]{encoding = T1, family = * }
+\fi
+\ifpdftex
+% Disable TeX punctuation ligatures whenever a code font shape is selected.
+\AddToHook{selectfont}{%
+  \ifnum\pdfstrcmp{\f@family}{\ttdefault}=0\relax
+    \pdfnoligatures\font
+  \fi}
 \fi
 
 % ---- Adjust font sizes and shapes ----
@@ -300,7 +309,7 @@
 
 \usepackage{listings}
 \lstdefinestyle{minimalcode}{
-  basicstyle=\ttfamily\scriptsize,
+  basicstyle=\ttfamily\footnotesize,
   backgroundcolor=\color{GitHubCanvasSubtle},
   keywordstyle=\color{GitHubCodeKeyword},
   commentstyle=\color{GitHubCodeComment},
