@@ -15,5 +15,3 @@
 *.vrb
 output/
 .test-tmp/
-docs/superpowers/
-.superpowers/

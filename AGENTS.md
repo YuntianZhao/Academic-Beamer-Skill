@@ -8,6 +8,7 @@ workflows, plans, and contributor documentation outside that directory.
 ## Required Checks
 
 Run all repository checks from the root:
+Allow approximately 15 minutes for the full suite.
 
 ```sh
 bash tests/run_all.sh
