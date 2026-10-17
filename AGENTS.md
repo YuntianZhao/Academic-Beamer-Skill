@@ -21,3 +21,17 @@ XeLaTeX. Generated test files belong under ignored temporary directories.
 
 Import only tagged releases from `YuntianZhao/Beamer-Template`. Never hand-edit
 vendored `presentation.sty`; update it through the synchronization workflow.
+
+## Agent skills
+
+### Issue tracker
+
+Issues, PRDs, and specs are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default canonical triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use the single-context layout: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.

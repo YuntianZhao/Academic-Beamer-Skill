@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Align repository domain-documentation guidance with the installed Matt Pocock
+  skills' `GLOSSARY.md` convention.
+- Refresh GitHub issue, sub-issue, and optional PR-triage guidance while preserving
+  the repository's tracker settings and workflows.
+
 ## v1.2.0 - 2026-08-26
 
 - Update the bundled `YuntianZhao/Beamer-Template` to v1.2.0.
